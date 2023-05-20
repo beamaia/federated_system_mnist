@@ -1,11 +1,16 @@
 import grpc
-import trainer_grpc_pb2
+import server_pb2 
+import server_pb2_grpc
+
+import client_pb2 
+import client_pb2_grpc
+
 from concurrent import futures
-import trainer_agregator_grpc_pb2_grpc
+
 
 def server():
     grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
-    trainer_agregator_grpc_pb2_grpc.TrainerAgregator(MineServicer(), grpc_server)
+    server_pb2_grpc.add_apiServicer_to_server(TrainerAgregator(), grpc_server)
     grpc_server.add_insecure_port('[::]:8080')
     grpc_server.start()
     grpc_server.wait_for_termination()
@@ -20,8 +25,21 @@ calculate_average
 repeat?
 '''
 
-class TrainerAgregator(trainer_agregator_grpc_pb2_grpc.apiServer):     
+class TrainerAgregator(server_pb2_grpc.apiServicer):     
     trainers = []
+    
+    def connect_to_trainer(self):
+        print("Connecting to trainer.")
+        if len(self.trainers) == 0:
+            print("No trainers connected.")
+            return False
+        else:
+            print("Trainer connected.")
+            info = self.trainers[0]
+            channel = grpc.insecure_channel(info["ipv4"] + ":" + str(info["port"]))
+            stub = client_pb2_grpc.apiStub(channel)
+
+            return stub.train_model(client_pb2.void())
 
     def add_trainer(self, request, context):
         self.trainers.append({
@@ -29,10 +47,16 @@ class TrainerAgregator(trainer_agregator_grpc_pb2_grpc.apiServer):
             "port": request.port,
             "ipv4": request.ipv4
         })
-        trainer_grpc_pb2.success(result=True)
+        # server_pb2_grpc.success(result=True)
 
-    def load_data(): pass
-    def load_data(): pass
+        print("Trainer added.")
+        print(self.trainers)
+
+        self.connect_to_trainer()
+        return server_pb2.void()
+
+    # def load_data(): pass
+    # def load_data(): pass
 
 
 if __name__ == '__main__':
