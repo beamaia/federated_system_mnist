@@ -2,8 +2,8 @@ syntax="proto3";
 
 package main;
 
-message sucessfull {
-    bool result = 1;
+message success {
+    int32 result = 1;
 }
 
 message trainer_request {
@@ -17,6 +17,6 @@ message void {
 }
 
 service api {
-    rpc add_trainer(trainer_request) returns (void);
+    rpc add_trainer(trainer_request) returns (success);
 }
 
