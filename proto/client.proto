@@ -2,8 +2,8 @@ syntax="proto3";
 
 package client;
 
-message sucessfull {
-    bool result = 1;
+message init_round {
+    int32 round_number = 1;
 }
 
 message metrics_results {
@@ -21,7 +21,7 @@ message void {
 }
 
 service api {
-    rpc train_model(void) returns (models_weights);
+    rpc train_model(void) returns (void);
     rpc connect(void) returns (void);
 }
 
