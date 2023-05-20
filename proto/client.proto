@@ -1,0 +1,27 @@
+syntax="proto3";
+
+package client;
+
+message sucessfull {
+    bool result = 1;
+}
+
+message metrics_results {
+    float accuracy = 1;
+    float precision = 2;
+    float recall = 3;
+}
+
+message models_weights {
+    string model_name = 1;
+    bytes weights = 2;
+}
+
+message void {
+}
+
+service api {
+    rpc train_model(void) returns (models_weights);
+    rpc connect(void) returns (void);
+}
+

@@ -3,7 +3,7 @@ syntax="proto3";
 package main;
 
 message sucessfull {
-    boolean result = 1;
+    bool result = 1;
 }
 
 message trainer_request {
@@ -12,8 +12,11 @@ message trainer_request {
     int32 port = 3;
 }
 
+message void {
 
-service TrainerAgregator {
-    rpc add_trainer(trainer_request) returns (sucessfull);
+}
+
+service api {
+    rpc add_trainer(trainer_request) returns (void);
 }
 
