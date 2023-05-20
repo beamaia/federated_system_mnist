@@ -1,0 +1,19 @@
+syntax="proto3";
+
+package main;
+
+message sucessfull {
+    boolean result = 1;
+}
+
+message trainer_request {
+    string uuid = 1;
+    string ipv4 = 2;
+    int32 port = 3;
+}
+
+
+service TrainerAgregator {
+    rpc add_trainer(trainer_request) returns (sucessfull);
+}
+
