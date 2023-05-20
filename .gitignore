@@ -1,5 +1,3 @@
-
-mine_grpc/
 .DS_Store
 *_pb2*.py
 
