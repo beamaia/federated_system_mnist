@@ -1,0 +1,2 @@
+python -m grpc_tools.protoc --proto_path=proto proto/server.proto --python_out=. --grpc_python_out=.
+python -m grpc_tools.protoc --proto_path=proto proto/client.proto --python_out=. --grpc_python_out=.
