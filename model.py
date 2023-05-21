@@ -26,13 +26,12 @@ def define_model(INPUT_SHAPE, NUM_CLASSES) -> Sequential:
 
     return model
 
-def ModelBase64Encoder(model):
+def ModelBase64Encoder(model_weights):
     """
     https://stackoverflow.com/questions/60567679/save-keras-model-weights-directly-to-bytes-memory
     """
-    model_json = model.to_json()
     bytes_container = BytesIO()
-    dill.dump(model_json, bytes_container)
+    dill.dump(model_weights, bytes_container)
     bytes_container.seek(0)
     bytes_file = bytes_container.read()
     base64File = base64.b64encode(bytes_file)
@@ -48,5 +47,4 @@ def ModelBase64Decoder(model_bytes):
     loaded_object.seek(0)
     ObjectFile = load(loaded_object)
     loaded_object.close()
-    model = model_from_json(ObjectFile)
-    return model
+    return ObjectFile
