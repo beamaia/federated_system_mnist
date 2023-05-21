@@ -21,7 +21,8 @@ from custom_thread import CustomThread
 from model import define_model, ModelBase64Encoder, ModelBase64Decoder
 
 import uuid
-
+import os
+import csv
 
 class TrainerAgregator(server_pb2_grpc.apiServicer):     
     trainers = []
@@ -30,7 +31,7 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
 
     def __init__(self, min_clients_per_round=2, max_clients_total=5, max_rounds=10, \
                  accuracy_threshold = 0.90, timeout = 300, save_model = False, \
-                 input_shape=(28, 28, 1), num_classes=10):
+                 save_test=False, input_shape=(28, 28, 1), num_classes=10):
         
         # Configuring federated learning parameters
         self.min_clients_per_round = min_clients_per_round
@@ -43,7 +44,8 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         
         self.timeout = timeout
         self.save_model = save_model
-
+        
+        self.save_test = save_test
         # Starting train function that verifies if training mode is on
         threading.Thread(target=self.__train).start()
 
@@ -83,12 +85,6 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
     
     #####################################################################
 
-    def __restart_config(self):
-        if not self.save_model:
-            self.model = define_model((28,28,1), 10)   
-        self.current_round = 0 
-
-    
     def __train(self):
         while True:
             if self.training_mode:
@@ -110,6 +106,9 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
                     accuracy_mean = np.mean(accuracies)
                     print(f"[{datetime.datetime.now()}] Mean accuracy: {accuracy_mean * 100: 0.2f}.")
 
+                    if self.save_test:
+                        self.__save_test(accuracy_mean)
+
                     if accuracy_mean >= self.accuracy_threshold:
                         print(f"[{datetime.datetime.now()}] Accuracy threshold reached. Stopping rounds.")
                         break
@@ -121,7 +120,30 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
                 self.__restart_config() 
 
                 time.sleep(self.timeout)
-                
+    
+    def __restart_config(self):
+        if not self.save_model:
+            self.model = define_model((28,28,1), 10)   
+        self.current_round = 0 
+
+    def __save_test(self, accuracy):
+        now = datetime.datetime.now()
+        
+        file_name = "test_server_results.csv"
+
+        new_file = os.path.isfile(file_name)
+
+        headers = ['accuracy', 'round', 'timestamp', 'session_uuid']
+
+        with open (file_name,'a') as csvfile:
+            writer = csv.DictWriter(csvfile, delimiter=',', lineterminator='\n',fieldnames=headers)
+            if not new_file:
+                writer.writeheader()
+            writer.writerow({'accuracy':accuracy, 
+                             'round': self.current_round, 
+                             'timestamp': now, 
+                             'session_uuid': self.uuid})
+            
     def __init_round(self):
         number_of_trainers =  randint(self.min_clients_per_round, len(self.trainers))
         selected_trainers = sample(self.trainers, number_of_trainers)
@@ -204,6 +226,7 @@ def parse_args():
     parser.add_argument('--accuracy_threshold', type=float, default=0.99, help='Minimum accuracy threshold.')
     parser.add_argument('--timeout', type=int, default=60, help='Timeout in seconds for the server between training sessions.')
     parser.add_argument('--save_model', action='store_true', default=False, help='Save the model after training. This means that the server will use this model for next training sessions.')
+    parser.add_argument('--save_test', action='store_true', default=False, help='Saves the test results in a csv file.')
     args = parser.parse_args()
     return args
 
@@ -215,7 +238,8 @@ def server(args):
                                                  max_rounds=args.max_rounds,
                                                  accuracy_threshold=args.accuracy_threshold,
                                                  save_model=args.save_model,
-                                                 timeout=args.timeout), grpc_server)
+                                                 timeout=args.timeout,
+                                                 save_test=args.save_test), grpc_server)
     
     grpc_server.add_insecure_port('localhost:8080')
     grpc_server.start()
