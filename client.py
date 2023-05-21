@@ -28,7 +28,8 @@ from model import ModelBase64Encoder, ModelBase64Decoder, define_model
 
 
 class Client(client_pb2_grpc.apiServicer):
-    def __init__(self, ipv4 = "localhost", store_training_data = False, store_test_data = False):
+    def __init__(self, ipv4 = "localhost", store_training_data = False, store_test_data = False, \
+                 batch_size = 32):
         self.uuid = str(uuid.uuid4())
         self.ipv4 = ipv4
         (self.x_train, self.y_train), (self.x_test, self.y_test) = self.load_data()
@@ -36,6 +37,7 @@ class Client(client_pb2_grpc.apiServicer):
         self.model = define_model((28, 28, 1), 10)
         self.opt = SGD(learning_rate=0.01, momentum=0.9)
         self.model.compile(optimizer=self.opt, loss='categorical_crossentropy', metrics=['accuracy'])
+        self.batch_size = batch_size
 
         self.listen = True
 
@@ -74,7 +76,7 @@ class Client(client_pb2_grpc.apiServicer):
         model_weights = ModelBase64Decoder(request.weights)
         self.model.set_weights(model_weights)
 
-        history = self.model.fit(x_train, y_train, batch_size=32 ,epochs=1, verbose=False)
+        history = self.model.fit(x_train, y_train, batch_size=self.batch_size ,epochs=1, verbose=False)
         model_weights = ModelBase64Encoder(self.model.get_weights())
 
         print(f"[{datetime.datetime.now()}] Training finished. Results:")
@@ -97,7 +99,7 @@ class Client(client_pb2_grpc.apiServicer):
         
         model_weights = ModelBase64Decoder(request.weights)
         self.model.set_weights(model_weights)
-        results = self.model.evaluate(x_test, y_test, batch_size=32, verbose=False)
+        results = self.model.evaluate(x_test, y_test, batch_size=self.batch_size, verbose=False)
 
         print(f"[{datetime.datetime.now()}] Testing finished. Results:")
         print(f"[{datetime.datetime.now()}] Accuracy: {results[1]}")
@@ -168,7 +170,7 @@ class Client(client_pb2_grpc.apiServicer):
         now = datetime.datetime.now()
         
         file_name = "train" if train else "test"
-        file_name += "_results.csv"
+        file_name += "_client_results.csv"
 
         new_file = os.path.isfile(file_name)
 
@@ -192,12 +194,13 @@ def parse_args():
     parser.add_argument('--ipv4', type=str, default='localhost', help='IPv4 address of the client')
     parser.add_argument('--save_train', action='store_true', default=False, help='Plot the training results')
     parser.add_argument('--save_test', action='store_true', default=False, help='Plot the testing results')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training')
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = parse_args()
     print(args)
-    client = Client(store_training_data=args.save_train, store_test_data=args.save_test, ipv4=args.ipv4)
+    client = Client(store_training_data=args.save_train, store_test_data=args.save_test, ipv4=args.ipv4, batch_size=args.batch_size)
     print(f"[{datetime.datetime.now()}] Client started.")
     client.connect_to_aggregator()
 
