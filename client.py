@@ -98,7 +98,7 @@ class Client(client_pb2_grpc.apiServicer):
         print(f"[{datetime.datetime.now()}]********************************************************")
         print(f"[{datetime.datetime.now()}] Training model. Round number: " + str(request.round_number))
  
-        percentage = int(1 / request.number_of_trainers * 100)
+        percentage = int(1 / (request.number_of_trainers + 10) * 100)
         min_lim = min(5, percentage)
         random_number = randint(min_lim, percentage) / 100
         
