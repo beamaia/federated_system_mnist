@@ -28,6 +28,29 @@ from model import ModelBase64Encoder, ModelBase64Decoder, define_model
 
 
 class Client(client_pb2_grpc.apiServicer):
+    """
+    Class representing a client
+
+    Attributes
+    ----------
+    uuid : str
+        Unique identifier of the client
+    ipv4 : str
+        IPv4 address of the client
+    port : int
+        Port of the client
+    x_train : numpy.ndarray
+        Training data
+    y_train : numpy.ndarray
+        Training labels
+    x_test : numpy.ndarray
+        Testing data
+    y_test : numpy.ndarray
+        Testing labels
+    model : tensorflow.keras.models.Sequential
+        Model to be trained
+
+    """
     def __init__(self, ipv4 = "localhost", store_training_data = False, store_test_data = False, \
                  batch_size = 32):
         self.uuid = str(uuid.uuid4())
@@ -59,6 +82,19 @@ class Client(client_pb2_grpc.apiServicer):
     
     ##############################################################################################################
     def train_model(self, request, context):
+        """
+        Trains the model
+
+        Parameters
+        ----------
+        request : client_pb2.models_weights_input
+            Request containing the model weights, current round and number of trainers
+
+        Returns
+        -------
+        client_pb2.models_weights_output
+            Returns the model weights and the sample size used for training
+        """
         print(f"[{datetime.datetime.now()}]********************************************************")
         print(f"[{datetime.datetime.now()}] Training model. Round number: " + str(request.round_number))
  
@@ -89,6 +125,19 @@ class Client(client_pb2_grpc.apiServicer):
         return client_pb2.models_weights_output(weights=model_weights, sample_amount=sample_size_train)
 
     def test_model(self, request, context):
+        """
+        Tests the model
+
+        Parameters
+        ----------
+        request : client_pb2.models_weights_input
+            Request containing the model weights, current round, number of trainers and uuid of the training session
+
+        Returns
+        -------
+        client_pb2.metrics_results
+            Returns the accuracy of the model
+        """
         print(f"[{datetime.datetime.now()}]********************************************************")
         print(f"[{datetime.datetime.now()}] Testing model.")
 
@@ -112,6 +161,19 @@ class Client(client_pb2_grpc.apiServicer):
     
 
     def finish_training(self, request, context):
+        """
+        Finishes the server
+
+        Parameters
+        ----------
+        request : client_pb2.finish_message
+            Request containing the end flag
+
+        Returns
+        -------
+        client_pb2.finish_message
+            Returns the end flag confirming the server is shutting down
+        """
         if request.end == 1:
             print(f"[{datetime.datetime.now()}] Training finished. Shutting down server, this could take a while...")
             self.listen = False
@@ -120,10 +182,21 @@ class Client(client_pb2_grpc.apiServicer):
     
     ##############################################################################################################
     def connect(self):
+        """
+        Connects to the aggregator server
+
+        Returns
+        -------
+        server_pb2.trainer_response
+            Returns the response to the server containing client's uuid, ipv4, port
+        """
         return self.stub.add_trainer(server_pb2.trainer_request(uuid=self.uuid, ipv4=self.ipv4, port=self.port))
     
     ##############################################################################################################
     def listen_to_server(self):
+        """
+        Listens to the server and waits for the training to finish
+        """
         while True:
             if not self.listen:
                 time.sleep(5)
@@ -132,6 +205,9 @@ class Client(client_pb2_grpc.apiServicer):
             time.sleep(60)
 
     def connect_to_aggregator(self):
+        """
+        Connects to the aggregator server and starts the client server
+        """
         res = self.connect()
         if res.result == 1:
             print(f"[{datetime.datetime.now()}] Connected to aggregator.")
@@ -142,6 +218,19 @@ class Client(client_pb2_grpc.apiServicer):
 
 
     def server(self, events=None):
+        """
+        Starts the client server
+
+        Parameters
+        ----------
+        events : threading.Event
+            Event to stop the client server
+        
+        Returns
+        -------
+        grpc.server
+            Returns the server
+        """
         grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
         client_pb2_grpc.add_apiServicer_to_server(self, grpc_server)
         grpc_server.add_insecure_port(f'{self.ipv4}:{self.port}')
@@ -151,8 +240,15 @@ class Client(client_pb2_grpc.apiServicer):
         print(f"[{datetime.datetime.now()}] Client listening on {self.ipv4}:{self.port}.")
         return grpc_server
 
-    # processamento de dados
     def load_data(self):
+        """
+        Loads the MNIST dataset
+
+        Returns
+        -------
+        tuple
+            Returns the training and testing data and labels
+        """
         mnist = tf.keras.datasets.mnist
         (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
@@ -167,6 +263,23 @@ class Client(client_pb2_grpc.apiServicer):
         return (x_train, y_train), (x_test, y_test)
 
     def store_information(self, loss, accuracy, round, session_uuid, train=True):
+        """
+        Stores the training and testing results in a csv file
+
+        Parameters
+        ----------
+        loss : float
+            Loss of the model
+        accuracy : float
+            Accuracy of the model
+        round : int
+            Round number
+        session_uuid : str
+            Unique identifier of the training session
+        train : bool
+            Flag to indicate if the results are from training or testing
+        """
+
         now = datetime.datetime.now()
         
         file_name = "train" if train else "test"

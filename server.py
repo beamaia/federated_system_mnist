@@ -24,7 +24,35 @@ import uuid
 import os
 import csv
 
-class TrainerAgregator(server_pb2_grpc.apiServicer):     
+class TrainerAgregator(server_pb2_grpc.apiServicer):
+    """
+    This class is responsible for managing the training sessions.
+
+    Attributes
+    ----------
+        trainers : list
+            List of trainers connected to the server.
+        training_mode : bool
+            Flag that indicates if the server is in training mode.
+        current_round : int
+            Current round of training.
+        min_clients_per_round : int
+            Minimum number of clients to train per round.
+        max_clients_total : int
+            Maximum number of clients connected per round.
+        max_rounds : int
+            Maximum number of rounds.
+        accuracy_threshold : float
+            Minimum accuracy threshold to stop training.
+        timeout : int
+            Timeout in seconds between training sessions.
+        save_model : bool
+            Flag that indicates if the server should save the model after training.
+        save_test : bool
+            Flag that indicates if the server should save the test results.
+        model : Sequential
+            Model used for training.
+    """
     trainers = []
     training_mode = False
     current_round = 0
@@ -51,6 +79,21 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
 
     #####################################################################
     def add_trainer(self, request, context):
+        """
+        Adds a trainer to the server and verifies if the server is ready to start training.
+
+        Parameters
+        ----------
+            request : server_pb2.trainer_info
+                Trainer information.
+            context : grpc._server._Context
+                Context of the request.
+
+        Returns
+        -------
+            server_pb2.success
+                Success message.
+        """
         self.trainers.append({
             "uuid": request.uuid,
             "port": request.port,
@@ -67,17 +110,72 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         return server_pb2.success(result=1)
     
     def train_models(self, ipv4, port, uuid, number_of_trainers):
+        """
+        Connectes to a trainer server and call it's training method.
+
+        Parameters
+        ----------
+            ipv4 : str
+                IPv4 of the trainer server.
+            port : int
+                Port of the trainer server.
+            uuid : str
+                UUID of the trainer server.
+            number_of_trainers : int
+                Number of trainers of this round.
+
+        Returns
+        -------
+            server_pb2.models_weights_output
+                Model weights and sample amount.
+        """
         channel = grpc.insecure_channel(ipv4 + ":" + str(port))
         stub = client_pb2_grpc.apiStub(channel)
         model_weights = ModelBase64Encoder(self.model.get_weights())
         return stub.train_model(client_pb2.models_weights_input(weights=model_weights, round_number=self.current_round, number_of_trainers=number_of_trainers, training_session=self.uuid))
     
     def test_models(self, ipv4, port, uuid, model_weights):
+        """
+        Connectes to a trainer server and call it's test method.
+
+        Parameters
+        ----------
+            ipv4 : str
+                IPv4 of the trainer server.
+            port : int
+                Port of the trainer server.
+            uuid : str
+                UUID of the trainer server.
+            model_weights : str
+                Model weights.
+
+        Returns
+        -------
+            server_pb2.accuracy
+                Accuracy obtained by the trainer.
+        """
         channel = grpc.insecure_channel(ipv4 + ":" + str(port))
         stub = client_pb2_grpc.apiStub(channel)
         return stub.test_model(client_pb2.models_weights_input(weights=model_weights, round_number=self.current_round, number_of_trainers=len(self.trainers), training_session=self.uuid))    
     
     def finish_training_round(self, ipv4, port, uuid):
+        """
+        Connectes to a trainer server and call it's finish training method.
+
+        Parameters
+        ----------
+            ipv4 : str
+                IPv4 of the trainer server.
+            port : int
+                Port of the trainer server.
+            uuid : str
+                UUID of the trainer server.
+
+        Returns
+        -------
+            server_pb2.success
+                Success message.
+        """
         print(f"[{datetime.datetime.now()}] Finishing training for trainer {uuid}.")
         channel = grpc.insecure_channel(ipv4+ ":" + str(port))
         stub = client_pb2_grpc.apiStub(channel)
@@ -86,6 +184,10 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
     #####################################################################
 
     def __train(self):
+        """
+        Loop that starts a training session when enough clients connected 
+        and waits for the timeout to start another one.
+        """
         while True:
             if self.training_mode:
                 self.uuid = str(uuid.uuid4())
@@ -122,11 +224,22 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
                 time.sleep(self.timeout)
     
     def __restart_config(self):
+        """
+        Restarts the server configuration.
+        """
         if not self.save_model:
             self.model = define_model((28,28,1), 10)   
         self.current_round = 0 
 
     def __save_test(self, accuracy):
+        """
+        Saves the test results in a csv file.
+
+        Parameters
+        ----------
+            accuracy : float
+                Accuracy obtained by the trainer.
+        """
         now = datetime.datetime.now()
         
         file_name = "test_server_results.csv"
@@ -145,6 +258,14 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
                              'session_uuid': self.uuid})
             
     def __init_round(self):
+        """
+        Initializes a training round creating a thread to connect to each trainer.
+
+        Returns
+        -------
+            list
+                List of results obtained by the trainers.
+        """
         number_of_trainers =  randint(self.min_clients_per_round, len(self.trainers))
         selected_trainers = sample(self.trainers, number_of_trainers)
 
@@ -165,6 +286,19 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         return [t.value for t in threads]
 
     def __federeated_train(self, results):
+        """
+        Calculates the federated average of the weights.
+
+        Parameters
+        ----------
+            results : list
+                List of results obtained by the trainers.
+
+        Returns
+        -------
+            list
+                List of aggregated weights.
+        """
         print(f"[{datetime.datetime.now()}] Calculating federated average.")
 
         weights_list = [ModelBase64Decoder(result.weights) for result in results]
@@ -184,6 +318,14 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         return new_weights
     
     def __test_round(self):
+        """
+        Tests the model in each trainer.
+
+        Returns
+        -------
+            list
+                List of accuracies obtained by the trainers.
+        """
         threads = []
         model_weights = ModelBase64Encoder(self.model.get_weights())
 
@@ -202,6 +344,9 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
     
 
     def __finish_training(self):
+        """
+        Finishes the training session in each trainer.
+        """
         threads = []
         while len(self.trainers):
             trainer = self.trainers.pop()

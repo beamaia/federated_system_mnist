@@ -14,6 +14,21 @@ import tempfile
 from io import BytesIO
 
 def define_model(INPUT_SHAPE, NUM_CLASSES) -> Sequential:
+    """
+    Define the model architecture
+
+    Parameters
+    ------------
+    INPUT_SHAPE: tuple
+        Shape of the input data
+    NUM_CLASSES: int
+        Number of classes
+
+    Returns
+    ------------
+    model: Sequential
+        Model architecture
+    """
     model = Sequential()
     model.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', input_shape=INPUT_SHAPE))
     model.add(MaxPool2D((2, 2)))
@@ -28,6 +43,8 @@ def define_model(INPUT_SHAPE, NUM_CLASSES) -> Sequential:
 
 def ModelBase64Encoder(model_weights):
     """
+    Encode the model weight to base64
+
     https://stackoverflow.com/questions/60567679/save-keras-model-weights-directly-to-bytes-memory
     """
     bytes_container = BytesIO()
@@ -39,6 +56,8 @@ def ModelBase64Encoder(model_weights):
 
 def ModelBase64Decoder(model_bytes):
     """
+    Decode the base64 encoded model weight
+
     https://stackoverflow.com/questions/60567679/save-keras-model-weights-directly-to-bytes-memory
     """
     loaded_binary = base64.b64decode(model_bytes)
