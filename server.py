@@ -12,6 +12,7 @@ import threading
 from random import sample, randint
 import time
 import argparse
+import numpy as np
 
 # Custom imports
 from custom_thread import CustomThread
@@ -49,11 +50,21 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         threading.Thread(target=self.train).start()
 
     def federeated_train(self, results):
-        weights_list = [[weight.numpy() for weight in ModelBase64Decoder(result.weights).weights] for result in results]
-        # media do array
-        new_weights = [sum(weights)/len(weights) for weights in zip(*weights_list)]
-        return new_weights
+        models = [ModelBase64Decoder(result.weights) for result in results]
 
+        sample_sizes = [result.sample_amount for result in results]
+        weights_list = [[weight.numpy() for weight in model.weights] for model in models]
+
+        new_weights = []
+        for layers in zip(*weights_list):
+            new_layer = np.average(layers, axis=0, weights=sample_sizes)
+            new_weights.append(new_layer)
+            
+        # new_weights = [np.average(layer, axis=0, weights=sample_sizes) for layer in zip(*weights_list)]
+        # new_weights = [[np.average(layer, axis=0, weights=sample_size) for layer in weights] for weights, sample_size in zip(weights_list, sample_sizes)]
+        # new_weights = np.average(weights_list, axis=1, weights=sample_sizes)
+        return new_weights
+    
     def train(self):
         while True:
             if self.training_mode:
@@ -67,7 +78,12 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
                     avg_weights = self.federeated_train(results)
                     self.model.set_weights(avg_weights)
 
-                    self.test_round()
+                    accuracies = self.test_round()
+                    print("Accuracies: {}".format(accuracies))
+                    accuracy_mean = np.mean(accuracies)
+
+                    if accuracy_mean >= self.accuracy_threshold:
+                        break
                     # send model to all clients
                     # receive metrics from clients
                     # compares model metrics with threshold
@@ -81,7 +97,7 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         threads = []
         for trainer in self.trainers:
             print(trainer)
-            threads.append(CustomThread(target=self.train_models, args=(trainer)))
+            threads.append(CustomThread(target=self.test_models, args=(trainer)))
 
         for thread in threads:
             thread.start()
@@ -89,31 +105,32 @@ class TrainerAgregator(server_pb2_grpc.apiServicer):
         for thread in threads:
             thread.join()   
 
-        return [t.value for t in threads]
+        return [t.value.accuracy for t in threads]
     
     def test_models(self, ipv4, port, uuid):
         channel = grpc.insecure_channel(ipv4 + ":" + str(port))
         stub = client_pb2_grpc.apiStub(channel)
         model_weights = ModelBase64Encoder(self.model)
-        return stub.test_model(client_pb2.models_weights_input(weights=model_weights, round_number=self.current_round))
+        return stub.test_model(client_pb2.models_weights(weights=model_weights, number_of_trainers=len(self.trainers)))
         
 
-    def train_models(self, ipv4, port, uuid):
+    def train_models(self, ipv4, port, uuid, number_of_trainers):
         channel = grpc.insecure_channel(ipv4 + ":" + str(port))
         stub = client_pb2_grpc.apiStub(channel)
         model_weights = ModelBase64Encoder(self.model)
-        return stub.train_model(client_pb2.models_weights_input(weights=model_weights, round_number=self.current_round))
+        return stub.train_model(client_pb2.models_weights_input(weights=model_weights, round_number=self.current_round, number_of_trainers=number_of_trainers))
         
 
     def init_round(self):
         print("Initializing round.")
         number_of_trainers =  randint(self.min_clients_per_round, len(self.trainers))
         selected_trainers = sample(self.trainers, number_of_trainers)
-        print(selected_trainers, number_of_trainers)
+
         threads = []
         for trainer in selected_trainers:
-            print(trainer)
-            threads.append(CustomThread(target=self.train_models, args=(trainer)))
+            aux = trainer.copy()
+            aux["number_of_trainers"] = number_of_trainers
+            threads.append(CustomThread(target=self.train_models, args=(aux)))
 
         for thread in threads:
             thread.start()
