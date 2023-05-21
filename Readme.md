@@ -112,7 +112,8 @@ threading.Thread(target=self.__train).start()
 
 This makes it so that a second thread is running, executing the __train method. This method is the one responible for listening in and triggering a training session. In order to have a time difference between each training session, we added a timeout after a session is completed. This means that if a session was to be finilized and new clients were available, training would only begin after the timeout was finished.
 
-An important decision made during the implementation was permiting new clients to join when a session has started. This means that while that client will not be participating in the current training round, it can be chosen for the next rounds.beha
+An important decision made during the implementation was permiting new clients to join when a session has started. This means that while that client will not be participating in the current training round, it can be chosen for the next rounds.
+
 The clients runs on a random generate port on `localhost`, however that can be changed if the ipv4 argument is configured elsewise. The code that represents each client can be found at [client.py](client.py). They end up having a type of behavior that is both of a client and a server. As a client, they add trainers to the server. As a server, they train the models and return the weights.
 
 To simulate data on the client side, we use tensorflow MNIST and reduce the train and test datasets. During the train portion of the code, this can be observed by
