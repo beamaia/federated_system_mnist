@@ -76,7 +76,17 @@ As for the client, three methods were created.
     ```
 
 ### Server
+The server runs on `localhost:8080` and it is responsible for starting and finishing training. Running steps:
 
-### Client
+1. Server has started and it is waiting clients's to connect.
+2. When `max_clients_total` connected to the server, it will start the training, sending to each one of them the model weights, current round and number of clients training. To do that, the server must connect to their servers.
+3. After training, each client sends back to the server their models weights.
+4. The server aggregates the weights calculating:
+    ```py
+    sum(weights * local_sample_size) / sum(local_sample_size)
+    ```
+5. The new weights are sended to every client (even non trainers), who then test the model and return the accuracies.
+6. Finally, the accuracies's mean is compared to the threshold, if it's smaller and current round < `max_rounds` then a new round starts. Else, training ends,  clients close their server and the server goes back to step 2.
+
 
 ## Analysis
