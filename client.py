@@ -33,9 +33,15 @@ class Client(client_pb2_grpc.apiServicer):
         self.stub = server_pb2_grpc.apiStub(self.channel)
 
     def train_model(self, request, context):
-        print("Training model.")
+        print("Training model. Round number: " + str(request.round_number))
 
-        sample_size_train = int((0.05)*len(self.x_train))
+        # 
+        percentage = int(1 / request.number_of_trainers * 100)
+        min_lim = min(5, percentage)
+        random_number = randint(min_lim, percentage) / 100
+        
+        sample_size_train = int(random_number * len(self.x_train))
+
 
         idx_train = np.random.choice(np.arange(len(self.x_train)), sample_size_train, replace=False)
         x_train = self.x_train[idx_train]
@@ -48,8 +54,8 @@ class Client(client_pb2_grpc.apiServicer):
         history = model.fit(x_train, y_train, batch_size=4 ,epochs=1, verbose=2)
         model_weights = ModelBase64Encoder(model)
 
-        return client_pb2.models_weights(weights=model_weights)
-    
+        return client_pb2.models_weights_output(weights=model_weights, sample_amount=sample_size_train)
+
     def connect_to_aggregator(self):
         grpc_server = self.server()
         print("Server started.")
@@ -80,6 +86,7 @@ class Client(client_pb2_grpc.apiServicer):
         x_test = x_test / 255.0
 
         y_train = tf.one_hot(y_train.astype(np.int32), depth=10)
+        y_test = tf.one_hot(y_test.astype(np.int32), depth=10)
     
         return (x_train, y_train), (x_test, y_test)
 
@@ -88,19 +95,21 @@ class Client(client_pb2_grpc.apiServicer):
         return res
 
     def test_model(self, request, context):
-        sample_size_test = int((0.05)*len(self.x_train))
-        idx_test = np.random.choice(np.arange(len(x_test)), sample_size_test, replace=False)
-        x_test = x_test[idx_test]
-        y_test = y_test.numpy()[idx_test]
+        print("Testing model.")
+
+        sample_size_test = int((1/request.number_of_trainers)*len(self.x_test))
+        idx_test = np.random.choice(np.arange(len(self.x_test)), sample_size_test, replace=False)
+        x_test = self.x_test[idx_test]
+        y_test = self.y_test.numpy()[idx_test]
         
         model = ModelBase64Decoder(request.weights)
         opt = SGD(learning_rate=0.01, momentum=0.9)
         model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
 
-        results = model.evaluate(x_test, y_test, batch_size=4)
+        results = model.evaluate(x_test, y_test, batch_size=4, verbose=False)
         print(results)
 
-        return client_pb2.test_result(accuracy=results[1])
+        return client_pb2.metrics_results(accuracy=results[1])
 
 if __name__ == '__main__':
     client = Client()
