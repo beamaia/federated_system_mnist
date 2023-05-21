@@ -10,10 +10,6 @@ message metrics_results {
     float accuracy = 1;
 }
 
-message models_weights {
-    bytes weights = 1;
-    int32 number_of_trainers = 2;
-}
 
 message models_weights_output {
     bytes weights = 1;
@@ -24,14 +20,17 @@ message models_weights_input {
     bytes weights = 1;
     int32 round_number = 2;
     int32 number_of_trainers = 3;
+    string training_session = 4;
 }
 
-message void {
+message finish_message {
+    int32 end = 1;
 }
+
 
 service api {
     rpc train_model(models_weights_input) returns (models_weights_output);
-    rpc test_model(models_weights) returns (metrics_results);
-    rpc connect(void) returns (void);
+    rpc test_model(models_weights_input) returns (metrics_results);
+    rpc finish_training(finish_message) returns (finish_message);
 }
 
