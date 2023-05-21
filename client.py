@@ -1,36 +1,66 @@
+# GRPC imports
 import grpc
 import client_pb2 
 import client_pb2_grpc
-
 import server_pb2
 import server_pb2_grpc
-
 from concurrent import futures
 
+# ML imports
+import tensorflow as tf
+from tensorflow.keras.optimizers import SGD
+import numpy as np
+
+# Other imports
+from random import randint
 import time 
 
+# Custom imports
+from model import ModelBase64Encoder, ModelBase64Decoder
+
+
 class Client(client_pb2_grpc.apiServicer):
-    # def load_data(): pass
-    # def load_data(): pass
     def __init__(self):
         self.uuid = "2"
         self.ipv4 = "localhost"
-        self.port = 5051
+        (self.x_train, self.y_train), (self.x_test, self.y_test) = self.load_data()
+        while True:
+            self.port = randint(1000, 9999)
+            if self.port != 8080:
+                break
 
         self.channel = grpc.insecure_channel('localhost:8080')
         self.stub = server_pb2_grpc.apiStub(self.channel)
 
     def train_model(self, request, context):
         print("Training model.")
-        time.sleep(5)
-        return client_pb2.void()
+
+        sample_size_train = int((0.05)*len(self.x_train))
+
+        idx_train = np.random.choice(np.arange(len(self.x_train)), sample_size_train, replace=False)
+        x_train = self.x_train[idx_train]
+        y_train = self.y_train.numpy()[idx_train]
+
+        model = ModelBase64Decoder(request.weights)
+        opt = SGD(learning_rate=0.01, momentum=0.9)
+        model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+
+        history = model.fit(x_train, y_train, batch_size=4 ,epochs=1, verbose=2)
+        model_weights = ModelBase64Encoder(model)
+
+        return client_pb2.models_weights(weights=model_weights)
     
     def connect_to_aggregator(self):
         grpc_server = self.server()
-        self.connect()
-        print("Client connected.")
-        grpc_server.wait_for_termination()
-        print('a')
+        print("Server started.")
+        print(f"Client listening on {self.ipv4}:{self.port}.")
+        res = self.connect()
+        if res.result == 1:
+            print("Connected to aggregator.")
+            grpc_server.wait_for_termination()
+        else:
+            print("Failed to connect to aggregator.")
+
 
     def server(self):
         grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
@@ -39,13 +69,38 @@ class Client(client_pb2_grpc.apiServicer):
         grpc_server.start()
         return grpc_server
 
+    # processamento de dados
+    def load_data(self):
+        mnist = tf.keras.datasets.mnist
+        (x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+        x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
+        x_train = x_train / 255.0
+        x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], x_test.shape[2], 1)
+        x_test = x_test / 255.0
+
+        y_train = tf.one_hot(y_train.astype(np.int32), depth=10)
+    
+        return (x_train, y_train), (x_test, y_test)
+
     def connect(self):
         res = self.stub.add_trainer(server_pb2.trainer_request(uuid=self.uuid, ipv4=self.ipv4, port=self.port))
-        print(res)
-        print("Connected to aggregator.")
         return res
 
-    
+    def test_model(self, request, context):
+        sample_size_test = int((0.05)*len(self.x_train))
+        idx_test = np.random.choice(np.arange(len(x_test)), sample_size_test, replace=False)
+        x_test = x_test[idx_test]
+        y_test = y_test.numpy()[idx_test]
+        
+        model = ModelBase64Decoder(request.weights)
+        opt = SGD(learning_rate=0.01, momentum=0.9)
+        model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+
+        results = model.evaluate(x_test, y_test, batch_size=4)
+        print(results)
+
+        return client_pb2.test_result(accuracy=results[1])
 
 if __name__ == '__main__':
     client = Client()
