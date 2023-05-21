@@ -8,20 +8,23 @@ message init_round {
 
 message metrics_results {
     float accuracy = 1;
-    float precision = 2;
-    float recall = 3;
 }
 
 message models_weights {
-    string model_name = 1;
-    bytes weights = 2;
+    bytes weights = 1;
+}
+
+message models_weights_input {
+    bytes weights = 1;
+    int32 round_number = 2;
 }
 
 message void {
 }
 
 service api {
-    rpc train_model(void) returns (void);
+    rpc train_model(models_weights_input) returns (models_weights);
+    rpc test_model(models_weights) returns (metrics_results);
     rpc connect(void) returns (void);
 }
 
