@@ -5,7 +5,7 @@ Implemeted by: Beatriz Maia, Iago Cerqueira & Sophie Dilhon
 
 ## Running the application
 ### Environment Config
-The application was made using Python 3.10 and a few libraries that you may need to install.
+The application was made using Python 3.10 and there are a few libraries that you may need to install.
 It is recommended to use a virtual environment, for that you may run the following commands:
 
 ```sh
@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```
 
 ### Execution
-To execute the system, first run one of the following scripts. They are responsible to create the files used by the clients and server communication via grpc.
+To execute the system, first run one of the following scripts. They are responsible to create the files used by the clients and server for the communication via grpc.
 
 ```sh
 # Mac or Linux
