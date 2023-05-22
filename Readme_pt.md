@@ -1,5 +1,5 @@
 # Aprendizado Federado
-Esta é uma implementação de Aprendizado Federado usando o algoritmo *Federated Average*.
+Esta é uma implementação de Aprendizado Federado usando o algoritmo *Federated Average*. Explicação em vídeo pode ser encontrado neste [link](https://youtu.be/umYhUZNY5Rc).
 
 Implementado por: Beatriz Maia, Iago Cerqueira & Sophie Dilhon
 
