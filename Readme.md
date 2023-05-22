@@ -1,5 +1,5 @@
 # Federated Learning
-This is a Federated Learning implementation using the algorithm Federated Average. Video explanation can be found in this [video](https://youtu.be/umYhUZNY5Rc) (video is in portuguese) or in the folder [video](video).
+This is a Federated Learning implementation using the algorithm Federated Average. Video explanation can be found in this [video](https://youtu.be/umYhUZNY5Rc) (video is in portuguese).
 
 Implemeted by: Beatriz Maia, Iago Cerqueira & Sophie Dilhon
 
